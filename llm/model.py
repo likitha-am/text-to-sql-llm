@@ -1,13 +1,16 @@
-from transformers import pipeline
-
-generator = pipeline("text2text-generation", model="google/flan-t5-base")
+import ollama
 
 def generate_sql(query):
     prompt = f"""
-You are a system that converts English to SQL.
+You are an expert SQL generator.
 
-Database schema:
-Table customers(id, name, age, city)
+Database:
+customers(id, name, age, city)
+
+Rules:
+- Only return SQL query
+- No explanation
+- Use only given table
 
 Examples:
 Q: Show all customers
@@ -25,7 +28,9 @@ Q: {query}
 A:
 """
 
-    result = generator(prompt, max_new_tokens=50)
-    sql = result[0]['generated_text'].strip()
+    response = ollama.chat(
+        model='mistral',
+        messages=[{"role": "user", "content": prompt}]
+    )
 
-    return sql
+    return response['message']['content'].strip()

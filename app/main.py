@@ -1,4 +1,7 @@
 from llm.model import generate_sql
+from database.db import create_table, run_query
+
+create_table()
 
 while True:
     user_input = input("Ask your query: ")
@@ -10,4 +13,10 @@ while True:
 
     print("\nGenerated SQL:")
     print(sql_query)
+
+    result = run_query(sql_query)
+
+    print("\nResult:")
+    print(result)
+
     print("-" * 50)
