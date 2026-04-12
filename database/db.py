@@ -41,11 +41,25 @@ def run_query(query):
     conn = create_connection()
     cursor = conn.cursor()
 
+    # Safety check
+    if any(word in query.lower() for word in ["drop", "delete", "update", "insert"]):
+        return {"error": "❌ Unsafe query blocked!"}
+
     try:
         cursor.execute(query)
+
         results = cursor.fetchall()
-        return results
+
+        # 👇 THIS IS THE MAGIC
+        column_names = [desc[0] for desc in cursor.description]
+
+        return {
+            "data": results,
+            "columns": column_names
+        }
+
     except Exception as e:
-        return f"Error: {e}"
+        return {"error": str(e)}
+
     finally:
         conn.close()
