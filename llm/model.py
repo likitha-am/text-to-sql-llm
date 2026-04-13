@@ -1,20 +1,24 @@
 import ollama
 from database.db import get_schema
+import re
 
 def generate_sql(user_query):
 
     schema = get_schema()
 
     prompt = f"""
-You are an expert SQL generator.
+You are a strict SQL generator.
 
 Database schema:
 {schema}
 
 Rules:
-- Only output SQL query
-- No explanation
-- Use correct table and column names
+- Output ONLY a valid SQLite query
+- NO explanation
+- NO markdown
+- DO NOT write 'sql'
+- Only one query
+- Always return all columns unless user specifies specific fields
 
 User query: {user_query}
 """
@@ -26,8 +30,20 @@ User query: {user_query}
 
     sql = response['message']['content']
 
-    # 🔥 Clean output
-    sql = sql.replace("`", "").strip()
-    sql = sql.split("\n")[0]
+    print("RAW LLM OUTPUT:", sql)  # 🔥 terminal debug
 
-    return sql
+    # 🔥 AGGRESSIVE CLEANING
+    sql = sql.strip()
+
+    # remove markdown
+    sql = re.sub(r"```.*?```", "", sql, flags=re.DOTALL)
+
+    # remove 'sql'
+    sql = re.sub(r"^sql", "", sql, flags=re.IGNORECASE).strip()
+
+    # extract valid query
+    match = re.search(r"(SELECT|INSERT|UPDATE|DELETE).*", sql, re.IGNORECASE)
+    if match:
+        sql = match.group(0)
+
+    return sql.strip()

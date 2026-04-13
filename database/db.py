@@ -69,14 +69,16 @@ def run_query(query):
     try:
         query = query.strip()
 
-        # 🔥 handle multi-statements
-        if ";" in query:
-            cursor.executescript(query)
-        else:
-            cursor.execute(query)
+        # 🔥 REMOVE semicolon (VERY IMPORTANT)
+        if query.endswith(";"):
+            query = query[:-1]
 
-        # SELECT queries
-        if cursor.description:
+        print("FINAL QUERY:", query)  # debug
+
+        cursor.execute(query)
+
+        # 🔥 THIS is the REAL check
+        if cursor.description is not None:
             results = cursor.fetchall()
             columns = [desc[0] for desc in cursor.description]
 
