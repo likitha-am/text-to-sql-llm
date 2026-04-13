@@ -1,36 +1,33 @@
 import ollama
+from database.db import get_schema
 
-def generate_sql(query):
+def generate_sql(user_query):
+
+    schema = get_schema()
+
     prompt = f"""
 You are an expert SQL generator.
 
-Database:
-customers(id, name, age, city)
+Database schema:
+{schema}
 
 Rules:
-- Only return SQL query
+- Only output SQL query
 - No explanation
-- Use only given table
+- Use correct table and column names
 
-Examples:
-Q: Show all customers
-A: SELECT * FROM customers;
-
-Q: Find customers older than 30
-A: SELECT * FROM customers WHERE age > 30;
-
-Q: List customers from London
-A: SELECT * FROM customers WHERE city = 'London';
-
-Now convert:
-
-Q: {query}
-A:
+User query: {user_query}
 """
 
     response = ollama.chat(
-        model='mistral',
+        model="mistral",
         messages=[{"role": "user", "content": prompt}]
     )
 
-    return response['message']['content'].strip()
+    sql = response['message']['content']
+
+    # 🔥 Clean output
+    sql = sql.replace("`", "").strip()
+    sql = sql.split("\n")[0]
+
+    return sql

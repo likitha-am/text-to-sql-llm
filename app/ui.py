@@ -2,13 +2,18 @@ import streamlit as st
 import pandas as pd
 
 from llm.model import generate_sql
-from database.db import create_table, run_query, is_dangerous
+from database.db import (
+    create_table,
+    run_query,
+    is_dangerous,
+    extract_table_name
+)
 
 st.set_page_config(page_title="Text-to-SQL", layout="centered")
 
 st.title("💬 Ask Your Database")
 
-# Ensure DB exists
+# (Optional demo setup)
 create_table()
 
 # 🔥 Session state
@@ -24,20 +29,20 @@ if "result" not in st.session_state:
 # Input
 user_input = st.text_input("Enter your query:")
 
-# 🔥 Generate SQL
+# Generate SQL
 if st.button("Generate SQL"):
     if user_input:
         st.session_state.sql_query = generate_sql(user_input)
         st.session_state.executed = False
         st.session_state.result = None
 
-# 🔥 Show SQL
+# Show SQL
 if st.session_state.sql_query:
 
     st.subheader("Generated SQL:")
     st.code(st.session_state.sql_query, language="sql")
 
-    # 🚨 Dangerous query check
+    # Dangerous query handling
     if is_dangerous(st.session_state.sql_query):
 
         st.warning("⚠️ This query will modify the database!")
@@ -45,26 +50,28 @@ if st.session_state.sql_query:
         confirm = st.radio(
             "Do you want to execute this query?",
             ("No", "Yes"),
-            index=0,  # ✅ always defaults to "No" on rerun
+            index=0,
             key="confirm_radio"
         )
 
         if confirm == "Yes":
+
             if st.button("🚀 Execute Query"):
+
                 if not st.session_state.executed:
                     st.session_state.result = run_query(st.session_state.sql_query)
                     st.session_state.executed = True
-                    st.rerun()  # ✅ force clean rerun to prevent double execution
+                    st.rerun()
+
         else:
             st.info("❌ Query cancelled")
 
     else:
-        # Safe queries auto-execute ONCE
         if not st.session_state.executed:
             st.session_state.result = run_query(st.session_state.sql_query)
             st.session_state.executed = True
 
-# 🔥 Show results
+# Show result
 if st.session_state.result:
 
     st.subheader("Result:")
@@ -90,13 +97,20 @@ if st.session_state.result:
         df = pd.DataFrame(result)
         st.table(df)
 
-# 🔥 Show updated table AFTER modification
-if st.session_state.executed and st.session_state.sql_query and is_dangerous(st.session_state.sql_query):
+# 🔥 Show updated table dynamically
+if (
+    st.session_state.executed
+    and st.session_state.sql_query
+    and is_dangerous(st.session_state.sql_query)
+):
 
-    st.subheader("🔄 Updated Customers Table:")
+    table_name = extract_table_name(st.session_state.sql_query)
 
-    updated = run_query("SELECT * FROM customers")
+    if table_name:
+        st.subheader(f"🔄 Updated {table_name} Table:")
 
-    if isinstance(updated, dict) and updated.get("data"):
-        df = pd.DataFrame(updated["data"], columns=updated["columns"])
-        st.table(df)
+        updated = run_query(f"SELECT * FROM {table_name}")
+
+        if isinstance(updated, dict) and updated.get("data"):
+            df = pd.DataFrame(updated["data"], columns=updated["columns"])
+            st.table(df)

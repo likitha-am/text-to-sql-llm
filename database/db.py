@@ -6,7 +6,7 @@ def create_connection():
     return sqlite3.connect("database/sample.db")
 
 
-# 🏗️ Create table ONLY (no auto insert ❌)
+# 🏗️ Create tables (ONLY for demo, can remove later)
 def create_table():
     conn = create_connection()
     cursor = conn.cursor()
@@ -17,7 +17,15 @@ def create_table():
         name TEXT,
         age INTEGER,
         city TEXT,
-        UNIQUE(name, age, city)  -- 🔥 prevents duplicates
+        UNIQUE(name, age, city)
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS orders (
+        order_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        amount INTEGER,
+        customer_id INTEGER
     )
     """)
 
@@ -25,7 +33,34 @@ def create_table():
     conn.close()
 
 
-# ⚙️ Run SQL query
+# 🧠 Get schema dynamically
+def get_schema():
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = cursor.fetchall()
+
+    schema = ""
+
+    for table in tables:
+        table_name = table[0]
+
+        if table_name == "sqlite_sequence":
+            continue
+
+        cursor.execute(f"PRAGMA table_info({table_name});")
+        columns = cursor.fetchall()
+
+        col_names = [col[1] for col in columns]
+
+        schema += f"{table_name}({', '.join(col_names)})\n"
+
+    conn.close()
+    return schema
+
+
+# ⚙️ Run query
 def run_query(query):
     conn = create_connection()
     cursor = conn.cursor()
@@ -33,18 +68,16 @@ def run_query(query):
     try:
         cursor.execute(query)
 
-        # ✅ SELECT queries
         if cursor.description:
             results = cursor.fetchall()
-            column_names = [desc[0] for desc in cursor.description]
+            columns = [desc[0] for desc in cursor.description]
 
             return {
                 "data": results,
-                "columns": column_names
+                "columns": columns
             }
 
         else:
-            # ✅ INSERT / DELETE / UPDATE
             conn.commit()
             return {"message": "✅ Query executed successfully"}
 
@@ -55,8 +88,20 @@ def run_query(query):
         conn.close()
 
 
-# 🚨 Detect dangerous queries (uses word boundaries to avoid false positives)
+# 🚨 Detect dangerous queries
 def is_dangerous(query):
-    dangerous_keywords = ["delete", "drop", "update", "insert"]
-    pattern = r'\b(' + '|'.join(dangerous_keywords) + r')\b'
+    keywords = ["delete", "drop", "update", "insert"]
+    pattern = r'\b(' + '|'.join(keywords) + r')\b'
     return bool(re.search(pattern, query.lower()))
+
+
+# 🧠 Extract table name dynamically
+def extract_table_name(query):
+    query = query.lower()
+
+    match = re.search(r'(from|into|update)\s+(\w+)', query)
+
+    if match:
+        return match.group(2)
+
+    return None
