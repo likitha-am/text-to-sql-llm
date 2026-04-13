@@ -1,65 +1,62 @@
 import sqlite3
+import re
 
+# 🔗 Create connection
 def create_connection():
-    conn = sqlite3.connect("database/sample.db")
-    return conn
+    return sqlite3.connect("database/sample.db")
 
 
+# 🏗️ Create table ONLY (no auto insert ❌)
 def create_table():
     conn = create_connection()
     cursor = conn.cursor()
 
-    # Create table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS customers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         age INTEGER,
-        city TEXT
+        city TEXT,
+        UNIQUE(name, age, city)  -- 🔥 prevents duplicates
     )
     """)
-
-    # Insert sample data (only if empty)
-    cursor.execute("SELECT COUNT(*) FROM customers")
-    count = cursor.fetchone()[0]
-
-    if count == 0:
-        cursor.executemany("""
-        INSERT INTO customers (name, age, city) VALUES (?, ?, ?)
-        """, [
-            ('Alice', 25, 'New York'),
-            ('Bob', 30, 'London'),
-            ('Charlie', 35, 'Paris'),
-            ('David', 40, 'London')
-        ])
 
     conn.commit()
     conn.close()
 
 
+# ⚙️ Run SQL query
 def run_query(query):
     conn = create_connection()
     cursor = conn.cursor()
 
-    # Safety check
-    if any(word in query.lower() for word in ["drop", "delete", "update", "insert"]):
-        return {"error": "❌ Unsafe query blocked!"}
-
     try:
         cursor.execute(query)
 
-        results = cursor.fetchall()
+        # ✅ SELECT queries
+        if cursor.description:
+            results = cursor.fetchall()
+            column_names = [desc[0] for desc in cursor.description]
 
-        # 👇 THIS IS THE MAGIC
-        column_names = [desc[0] for desc in cursor.description]
+            return {
+                "data": results,
+                "columns": column_names
+            }
 
-        return {
-            "data": results,
-            "columns": column_names
-        }
+        else:
+            # ✅ INSERT / DELETE / UPDATE
+            conn.commit()
+            return {"message": "✅ Query executed successfully"}
 
     except Exception as e:
         return {"error": str(e)}
 
     finally:
         conn.close()
+
+
+# 🚨 Detect dangerous queries (uses word boundaries to avoid false positives)
+def is_dangerous(query):
+    dangerous_keywords = ["delete", "drop", "update", "insert"]
+    pattern = r'\b(' + '|'.join(dangerous_keywords) + r')\b'
+    return bool(re.search(pattern, query.lower()))
