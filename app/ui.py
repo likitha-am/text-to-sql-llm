@@ -3,6 +3,7 @@ import pandas as pd
 
 from llm.model import generate_sql
 from database.db import (
+    create_connection,
     create_table,
     run_query,
     is_dangerous,
@@ -13,10 +14,34 @@ st.set_page_config(page_title="Text-to-SQL", layout="centered")
 
 st.title("💬 Ask Your Database")
 
-# (Optional demo setup)
+# (Optional demo tables)
 create_table()
 
-# 🔥 Session state
+# 🔥 FILE UPLOAD
+uploaded_file = st.file_uploader("📂 Upload CSV or Excel", type=["csv", "xlsx"])
+
+if uploaded_file:
+
+    if uploaded_file.name.endswith(".csv"):
+        df = pd.read_csv(uploaded_file)
+    else:
+        df = pd.read_excel(uploaded_file)
+
+    table_name = uploaded_file.name.split(".")[0].lower().replace(" ", "_")
+
+    conn = create_connection()
+
+    df.to_sql(table_name, conn, if_exists="replace", index=False)
+
+    conn.close()
+
+    st.success(f"✅ Table '{table_name}' created successfully!")
+
+    st.subheader("Preview:")
+    st.dataframe(df.head())
+
+
+# 🔥 SESSION STATE
 if "sql_query" not in st.session_state:
     st.session_state.sql_query = None
 
@@ -26,23 +51,23 @@ if "executed" not in st.session_state:
 if "result" not in st.session_state:
     st.session_state.result = None
 
-# Input
+# INPUT
 user_input = st.text_input("Enter your query:")
 
-# Generate SQL
+# GENERATE SQL
 if st.button("Generate SQL"):
     if user_input:
         st.session_state.sql_query = generate_sql(user_input)
         st.session_state.executed = False
         st.session_state.result = None
 
-# Show SQL
+# SHOW SQL
 if st.session_state.sql_query:
 
     st.subheader("Generated SQL:")
     st.code(st.session_state.sql_query, language="sql")
 
-    # Dangerous query handling
+    # ⚠️ Dangerous query handling
     if is_dangerous(st.session_state.sql_query):
 
         st.warning("⚠️ This query will modify the database!")
@@ -71,7 +96,7 @@ if st.session_state.sql_query:
             st.session_state.result = run_query(st.session_state.sql_query)
             st.session_state.executed = True
 
-# Show result
+# SHOW RESULT
 if st.session_state.result:
 
     st.subheader("Result:")
@@ -85,7 +110,7 @@ if st.session_state.result:
 
         elif result.get("data"):
             df = pd.DataFrame(result["data"], columns=result["columns"])
-            st.table(df)
+            st.dataframe(df)
 
         elif "message" in result:
             st.success(result["message"])
@@ -95,9 +120,9 @@ if st.session_state.result:
 
     elif isinstance(result, list) and len(result) > 0:
         df = pd.DataFrame(result)
-        st.table(df)
+        st.dataframe(df)
 
-# 🔥 Show updated table dynamically
+# 🔄 SHOW UPDATED TABLE (DYNAMIC)
 if (
     st.session_state.executed
     and st.session_state.sql_query
@@ -113,4 +138,4 @@ if (
 
         if isinstance(updated, dict) and updated.get("data"):
             df = pd.DataFrame(updated["data"], columns=updated["columns"])
-            st.table(df)
+            st.dataframe(df)

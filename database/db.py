@@ -6,7 +6,7 @@ def create_connection():
     return sqlite3.connect("database/sample.db")
 
 
-# 🏗️ Create tables (ONLY for demo, can remove later)
+# 🏗️ Create tables (only for demo — optional in production)
 def create_table():
     conn = create_connection()
     cursor = conn.cursor()
@@ -46,6 +46,7 @@ def get_schema():
     for table in tables:
         table_name = table[0]
 
+        # skip SQLite internal table
         if table_name == "sqlite_sequence":
             continue
 
@@ -60,14 +61,21 @@ def get_schema():
     return schema
 
 
-# ⚙️ Run query
+# ⚙️ Run SQL query (robust version)
 def run_query(query):
     conn = create_connection()
     cursor = conn.cursor()
 
     try:
-        cursor.execute(query)
+        query = query.strip()
 
+        # 🔥 handle multi-statements
+        if ";" in query:
+            cursor.executescript(query)
+        else:
+            cursor.execute(query)
+
+        # SELECT queries
         if cursor.description:
             results = cursor.fetchall()
             columns = [desc[0] for desc in cursor.description]
