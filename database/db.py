@@ -115,3 +115,27 @@ def extract_table_name(query):
         return match.group(2)
 
     return None
+
+def get_all_tables():
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = [t[0] for t in cursor.fetchall() if t[0] != "sqlite_sequence"]
+
+    conn.close()
+    return tables
+
+
+def get_table_schema(table_name):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(f"PRAGMA table_info({table_name});")
+    columns = cursor.fetchall()
+
+    col_names = [col[1] for col in columns]
+
+    conn.close()
+
+    return f"{table_name}({', '.join(col_names)})"

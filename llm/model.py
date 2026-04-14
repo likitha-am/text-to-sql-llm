@@ -1,10 +1,10 @@
+from rag.retriever import build_schema_context
 import ollama
-from database.db import get_schema
 import re
 
 def generate_sql(user_query):
 
-    schema = get_schema()
+    schema = build_schema_context(user_query)
 
     prompt = f"""
 You are a strict SQL generator.
@@ -13,12 +13,9 @@ Database schema:
 {schema}
 
 Rules:
-- Output ONLY a valid SQLite query
-- NO explanation
-- NO markdown
-- DO NOT write 'sql'
-- Only one query
-- Always return all columns unless user specifies specific fields
+- Output ONLY SQL
+- No explanation
+- Return all columns unless specified
 
 User query: {user_query}
 """
@@ -30,18 +27,11 @@ User query: {user_query}
 
     sql = response['message']['content']
 
-    print("RAW LLM OUTPUT:", sql)  # 🔥 terminal debug
-
-    # 🔥 AGGRESSIVE CLEANING
+    # cleaning
     sql = sql.strip()
-
-    # remove markdown
     sql = re.sub(r"```.*?```", "", sql, flags=re.DOTALL)
-
-    # remove 'sql'
     sql = re.sub(r"^sql", "", sql, flags=re.IGNORECASE).strip()
 
-    # extract valid query
     match = re.search(r"(SELECT|INSERT|UPDATE|DELETE).*", sql, re.IGNORECASE)
     if match:
         sql = match.group(0)
