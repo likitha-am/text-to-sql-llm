@@ -1,28 +1,35 @@
-from database.db import get_all_tables, get_table_schema
-
-def retrieve_relevant_tables(user_query):
-    tables = get_all_tables()
-
-    query = user_query.lower()
-    relevant_tables = []
-
-    for table in tables:
-        if table.lower() in query:
-            relevant_tables.append(table)
-
-    # 🔥 fallback → if nothing matches, return all tables
-    if not relevant_tables:
-        return tables
-
-    return relevant_tables
+from rag.vector_store import search_schema
+from database.db import get_relationships
 
 
 def build_schema_context(user_query):
-    tables = retrieve_relevant_tables(user_query)
+    results = search_schema(user_query, top_k=10)
+    relationships = get_relationships()
+
+    schema_dict = {}
+
+    for item in results:
+        table = item["table"]
+        column = item["column"]
+
+        if table not in schema_dict:
+            schema_dict[table] = set()
+
+        schema_dict[table].add(column)
 
     schema = ""
 
-    for table in tables:
-        schema += get_table_schema(table) + "\n"
+    # 🔥 Add tables + columns
+    for table, columns in schema_dict.items():
+        schema += f"{table}({', '.join(columns)})\n"
+
+    # ✅ Make JOIN instructions crystal clear for the LLM
+    if relationships:
+        schema += "\nRelationships (YOU MUST USE JOIN FOR THESE):\n"
+        for rel in relationships:
+            schema += (
+                f"- {rel['table']} JOIN {rel['to_table']} "
+                f"ON {rel['table']}.{rel['from']} = {rel['to_table']}.{rel['to']}\n"
+            )
 
     return schema
